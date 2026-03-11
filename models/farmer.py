@@ -17,6 +17,8 @@ class Farmer(Base):
     land_size = Column(Float)
     crop_types = Column(Text)
     farmer_category = Column(String)
+    irrigation_type = Column(String)
+    annual_income = Column(Float)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)

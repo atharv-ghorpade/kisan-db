@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, Boolean
 from database.base import Base
 from datetime import datetime
 
@@ -21,6 +21,6 @@ class Scheme(Base):
     contact_email = Column(String)
     contact_phone = Column(String)
     official_url = Column(String)
-    is_active = Column(String, default=True)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -1,23 +1,34 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import get_db
-from pydantic import BaseModel, EmailStr
+from schemas.farmer_schema import FarmerCreate, FarmerOut, LoginRequest
+from services.auth_service import register_farmer, authenticate_farmer
+from core.security import create_access_token
 
-router = APIRouter()
+router = APIRouter(tags=["Authentication"])
 
-class RegisterRequest(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-@router.post("/auth/register")
-async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    return {"message": "Registration endpoint - store farmer in DB", "email": data.email}
+@router.post("/auth/register", response_model=FarmerOut)
+async def register(data: FarmerCreate, db: AsyncSession = Depends(get_db)):
+    return await register_farmer(db, data)
 
 @router.post("/auth/login")
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    return {"access_token": "token123", "token_type": "bearer"}
+    farmer = await authenticate_farmer(db, data.phone, data.password)
+    if not farmer:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid phone number or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token = create_access_token(data={"sub": farmer.phone})
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {
+            "id": farmer.id,
+            "name": farmer.name,
+            "phone": farmer.phone,
+            "role": "farmer"
+        }
+    }
