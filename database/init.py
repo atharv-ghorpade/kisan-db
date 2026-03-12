@@ -32,4 +32,13 @@ async def init_db():
 
 async def close_db():
     """Close database connection"""
-    await engine.dispose()
+import os
+import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def get_db_connection():
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:root@localhost:5432/kisan_db")
+    db_url = db_url.replace("+asyncpg", "")
+    return psycopg2.connect(db_url)

@@ -53,3 +53,70 @@ app.include_router(document_router)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Kisan Sathi API! 🚀"}
+
+from pydantic import BaseModel
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scoring_engine import recommend_schemes
+from database.init import get_db_connection
+
+class FarmerProfile(BaseModel):
+    state: str
+    land_hectares: float
+    land_ownership: str
+    crop_type: str
+    annual_income_rs: int
+    age: int
+    caste: str
+    gender: str
+    irrigation_type: str
+    is_income_tax_payer: bool = False
+    is_government_employee: bool = False
+    is_pensioner_above_10k: bool = False
+    is_pm_kisan_beneficiary: bool = False
+    has_aadhaar: bool = True
+    has_land_records: bool = True
+
+@app.post("/api/recommend")
+def recommend(profile: FarmerProfile):
+    return recommend_schemes(profile.model_dump())
+
+@app.get("/api/schemes")
+def list_schemes(state: str = None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if state:
+        cursor.execute(
+            "SELECT * FROM schemes WHERE state = %s OR state = 'Nationwide' ORDER BY state",
+            (state,)
+        )
+    else:
+        cursor.execute("SELECT * FROM schemes ORDER BY state")
+    rows = cursor.fetchall()
+    
+    # Get column names
+    col_names = [desc[0] for desc in cursor.description]
+    result = [dict(zip(col_names, row)) for row in rows]
+    
+    cursor.close()
+    conn.close()
+    return {"schemes": result}
+
+@app.get("/api/schemes/{scheme_id}")
+def get_scheme(scheme_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM schemes WHERE id = %s", (scheme_id,))
+    row = cursor.fetchone()
+    
+    if not row:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Scheme not found")
+        
+    col_names = [desc[0] for desc in cursor.description]
+    result = dict(zip(col_names, row))
+    
+    cursor.close()
+    conn.close()
+    return {"scheme": result}
