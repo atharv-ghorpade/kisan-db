@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from datetime import datetime
 from database.init import init_db, close_db
 
 # Import all routers
@@ -52,7 +53,17 @@ app.include_router(document_router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Kisan Sathi API! 🚀"}
+    return {"message": "Welcome to Kisan Sathi API! 🚀", "status": "online"}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "Kisan Sathi Backend",
+        "version": "1.0.0",
+        "timestamp": datetime.now().isoformat()
+    }
 
 from pydantic import BaseModel
 import sys
@@ -84,39 +95,50 @@ def recommend(profile: FarmerProfile):
 
 @app.get("/api/schemes")
 def list_schemes(state: str = None):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    if state:
-        cursor.execute(
-            "SELECT * FROM schemes WHERE state = %s OR state = 'Nationwide' ORDER BY state",
-            (state,)
-        )
-    else:
-        cursor.execute("SELECT * FROM schemes ORDER BY state")
-    rows = cursor.fetchall()
-    
-    # Get column names
-    col_names = [desc[0] for desc in cursor.description]
-    result = [dict(zip(col_names, row)) for row in rows]
-    
-    cursor.close()
-    conn.close()
-    return {"schemes": result}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if state:
+            cursor.execute(
+                "SELECT * FROM schemes WHERE state = %s OR state = 'Nationwide' ORDER BY state",
+                (state,)
+            )
+        else:
+            cursor.execute("SELECT * FROM schemes ORDER BY state")
+        rows = cursor.fetchall()
+        
+        # Get column names
+        col_names = [desc[0] for desc in cursor.description]
+        result = [dict(zip(col_names, row)) for row in rows]
+        
+        cursor.close()
+        conn.close()
+        return {"schemes": result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"schemes": [], "error": str(e)}
 
 @app.get("/api/schemes/{scheme_id}")
 def get_scheme(scheme_id: int):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM schemes WHERE id = %s", (scheme_id,))
-    row = cursor.fetchone()
-    
-    if not row:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Scheme not found")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM schemes WHERE id = %s", (scheme_id,))
+        row = cursor.fetchone()
         
-    col_names = [desc[0] for desc in cursor.description]
-    result = dict(zip(col_names, row))
-    
-    cursor.close()
-    conn.close()
-    return {"scheme": result}
+        if not row:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Scheme not found")
+            
+        col_names = [desc[0] for desc in cursor.description]
+        result = dict(zip(col_names, row))
+        
+        cursor.close()
+        conn.close()
+        return {"scheme": result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
